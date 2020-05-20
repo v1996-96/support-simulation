@@ -1,0 +1,89 @@
+library(vcd)
+library(graphics)
+library(dplyr)
+library(fitdistrplus)
+library(stringr)
+library(ggplot2)
+library(RColorBrewer)
+theme_set(theme_minimal())
+
+display.brewer.all()
+cols<-brewer.pal(n=7,name="Dark2")
+
+data = list(
+  full = read.csv('data/first-line-processing-time.csv'),
+  func = read.csv('data/old/func_processing_time.csv'),
+  tech = read.csv('data/old/tech_processing_time.csv'),
+  block = read.csv('data/old/block_processing_time.csv'),
+  reject = read.csv('data/old/reject_processing_time.csv'),
+  nuz = read.csv('data/old/nuz_processing_time.csv'),
+  delivery = read.csv('data/old/delivery_processing_time.csv'),
+  mobile = read.csv('data/old/mobile_processing_time.csv')
+)
+
+remove_outliers = function(data) {
+  qnt = quantile(data, probs = c(1/4, 3/4))
+  iqr_dist = 1.5 * IQR(data)
+  left = qnt[1] - iqr_dist
+  right = qnt[2] + iqr_dist
+  
+  return(data[data >= left & data <= right])
+}
+
+data_refined = list(
+  full = remove_outliers(data$full$processing_time),
+  func = remove_outliers(data$func$processing_time),
+  tech = remove_outliers(data$tech$processing_time),
+  block = remove_outliers(data$block$processing_time),
+  reject = remove_outliers(data$reject$processing_time),
+  nuz = remove_outliers(data$nuz$processing_time),
+  delivery = remove_outliers(data$delivery$processing_time),
+  mobile = remove_outliers(data$mobile$processing_time)
+)
+
+data_table = list(
+  full = table(data_refined$full),
+  func = table(data_refined$func),
+  tech = table(data_refined$tech),
+  block = table(data_refined$block),
+  reject = table(data_refined$reject),
+  nuz = table(data_refined$nuz),
+  delivery = table(data_refined$delivery),
+  mobile = table(data_refined$mobile)
+)
+
+data_density = list(
+  # full = density(data_refined$full, from = 0),
+  func = density(data_refined$func, from = 0),
+  tech = density(data_refined$tech, from = 0),
+  block = density(data_refined$block, from = 0),
+  nuz = density(data_refined$nuz, from = 0),
+  delivery = density(data_refined$delivery, from = 0),
+  reject = density(data_refined$reject, from = 0),
+  mobile = density(data_refined$mobile, from = 0)
+)
+
+# func_weighted_table = data_table$func / length(data_refined$func)
+# plot(func_weighted_table, type='l')
+# plot(data_density$func)
+
+# par(mfrow=c(4,2), mar=c(2,2,2,2))
+cols = rainbow(7)
+cols<-brewer.pal(n=7,name="Dark2")
+i = 1
+plot(x = c(), xlab = '', ylab = '', main = '', xlim = c(0, 330), ylim = c(0, 0.013), mar=c(2,2,2,2))
+for (dataset in data_density) {
+  i = i + 1
+  lines(dataset, col = cols[i], lwd=2)
+}
+
+legend("topright", legend = paste('Линия', 1:7, sep=" "), col = cols, lty=1, lwd=5, cex=0.8, bty="n")
+
+
+# Goodfit poisson test
+fit_w  <- fitdist(as.numeric(data_table$tech), "weibull")
+fit_g  <- fitdist(as.numeric(data_table$tech), "gamma")
+fit_ln <- fitdist(as.numeric(data_table$tech), "lnorm")
+
+plot(fit_ln)
+summary(fit_ln)

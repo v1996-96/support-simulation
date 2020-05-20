@@ -1,0 +1,46 @@
+library(vcd)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(fitdistrplus)
+
+# data = read.csv('data/first-line-resolve-flow2.csv')
+data = read.csv('data/func-resolve-flow.csv')
+
+data$resolve_date <- str_replace_all(data$resolve_date, "T", " ")
+data$resolve_date <- sort(as_datetime(data$resolve_date))
+data$by_hour = floor_date(data$resolve_date, 'hour')
+data$by_30 = floor_date(data$resolve_date, '30 mins')
+data$by_10 = floor_date(data$resolve_date, '10 mins')
+data$by_1 = floor_date(data$resolve_date, '1 mins')
+
+# flow_12 = filter(data, hour(resolve_date) >= 10 & hour(resolve_date) <= 18 & day(resolve_date) == 5)
+flow_12 = filter(data, hour(resolve_date) >= 10 & hour(resolve_date) <= 18)
+
+fit_poisson = goodfit(flow_12$tickets_cnt, type = "poisson", method = "ML")
+fit_binomial = goodfit(flow_12$tickets_cnt, type = "binomial", method = "ML")
+fit_nbinomial = goodfit(flow_12$tickets_cnt, type = "nbinomial", method = "ML")
+fit_weibull  <- fitdist(flow_12$tickets_cnt, "weibull")
+fit_gamma  <- fitdist(flow_12$tickets_cnt, "gamma")
+fit_lnorm <- fitdist(flow_12$tickets_cnt[flow_12$tickets_cnt > 0], "lnorm")
+
+plot(density(flow_12$tickets_cnt, from = 0))
+plot(fit_lnorm, histo = FALSE, demp = TRUE)
+summary(fit_lnorm)
+
+
+
+
+
+data(groundbeef)
+serving <- groundbeef$serving
+fitg <- fitdist(serving, "gamma")
+summary(fitg)
+plot(fitg)
+plot(fitg, demp = TRUE)
+plot(fitg, histo = FALSE, demp = TRUE)
+cdfcomp(fitg, addlegend=FALSE)
+denscomp(fitg, addlegend=FALSE)
+ppcomp(fitg, addlegend=FALSE)
+qqcomp(fitg, addlegend=FALSE)
+

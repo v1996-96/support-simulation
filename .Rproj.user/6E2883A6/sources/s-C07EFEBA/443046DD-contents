@@ -1,0 +1,120 @@
+library(vcd)
+library(dplyr)
+library(lubridate)
+library(stringr)
+library(fitdistrplus)
+
+# lambda = 7
+# mu = 1
+# n = 7.1
+
+calc_params = function(data, n) {
+  lambda = data$lambda
+  mu = data$mu
+  
+  # Интенсивность обслуживания
+  ro = lambda/mu
+  
+  # Должно быть меньше 1
+  ro_n = ro/n
+  
+  # Вероятности нахождения в состоянии i
+  p = c()
+  for (i in 1:n) {
+    p = c(p, (ro^i)/factorial(i))
+  }
+  
+  # Вероятность отсутствия очереди - 0 состояние
+  p0 = (1 + sum(p) + (ro^(n+1))/factorial(n)*(n-ro))^-1
+  
+  # Вероятность нахождения в очереди
+  p_och = ( (ro^(n+1)) / factorial(n)*(n-ro) ) * p0
+  
+  # Длина очереди
+  l_och = (n/(n - ro)) * p_och
+  
+  # Количество обслуживаемых заявок
+  l_obs = ro
+  
+  # Число заявок в системе
+  l_sist = l_och + l_obs
+  
+  # Время в очереди
+  t_och = l_och/lambda
+  
+  # Время в системе
+  t_all = t_och + 1/mu
+  
+  # Коэффициент занятости
+  k_zan = ro/n
+  
+  # Число занятых каналов
+  n_zan = ro
+  
+  return(list(
+    lambda = lambda, mu = mu, n = n, ro = ro, ro_n = ro_n, p = p,
+    p0 = p0, p_och = p_och, l_och = l_och, l_obs = l_obs,
+    l_sist = l_sist, p_otk = 0, abs = lambda, otn = 1,
+    t_och = t_och, t_all = t_all, k_zan = k_zan, n_zan = n_zan
+  ))
+}
+
+refine = function(data) {
+  data$time <- str_replace_all(data$time, "T", " ")
+  data$time <- sort(as_datetime(data$time))
+  data$by_1 = floor_date(data$time, '1 mins')
+  return(data)
+}
+
+get_lambda_mu = function(data) {
+  flow_12 = filter(data, hour(time) >= 10 & hour(time) <= 18)
+  
+  return(list(
+    lambda = mean(flow_12$created_tickets_cnt),
+    mu = mean(flow_12$resolved_tickets_cnt)
+  ))
+}
+
+n = 100
+
+data = list(
+  func = read.csv('data/flow/func-flow.csv'),
+  tech = read.csv('data/flow/tech-flow.csv'),
+  block = read.csv('data/flow/block-flow.csv'),
+  reject = read.csv('data/flow/reject-flow.csv'),
+  nuz = read.csv('data/flow/nuz-flow.csv'),
+  delivery = read.csv('data/flow/delivery-flow.csv'),
+  mobile = read.csv('data/flow/mobile-flow.csv')
+)
+
+data_refined = list(
+  func = refine(data$func),
+  tech = refine(data$tech),
+  block = refine(data$block),
+  reject = refine(data$reject),
+  nuz = refine(data$nuz),
+  delivery = refine(data$delivery),
+  mobile = refine(data$mobile)
+)
+
+data_12 = list(
+  func = get_lambda_mu(data_refined$func),
+  tech = get_lambda_mu(data_refined$tech),
+  block = get_lambda_mu(data_refined$block),
+  reject = get_lambda_mu(data_refined$reject),
+  nuz = get_lambda_mu(data_refined$nuz),
+  delivery = get_lambda_mu(data_refined$delivery),
+  mobile = get_lambda_mu(data_refined$mobile)
+)
+
+data_12_params = list(
+  func = calc_params(data_12$func, 90),
+  tech = calc_params(data_12$tech, 80),
+  block = calc_params(data_12$block, 77),
+  reject = calc_params(data_12$reject, 45),
+  nuz = calc_params(data_12$nuz, 90),
+  delivery = calc_params(data_12$delivery, 50),
+  mobile = calc_params(data_12$mobile, 14)
+)
+
+data_12_params$mobile
